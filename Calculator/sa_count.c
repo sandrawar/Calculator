@@ -3,7 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define max_dl_liczby 40
+#define max_dl_liczby 10
 #define max_dl_linii (max_dl_liczby + 1)
 #define max_do 7
 
@@ -30,6 +30,7 @@ int porownajLiczby(int* liczba1, int* liczba2);
 int dlugoscLiczby(int* liczba);
 void kopiujCyfry(int* zrodlo, int* przeznaczenie);
 void zerujCyfry(int* liczba);
+void ustawCyfry(int* liczba, int cyfra);
 int stworzLiczbe(int liczba, int podstawa, int* wynik);
 
 int main(int argc, char *argv[]){
@@ -127,6 +128,15 @@ int zamianaPodstawy(int* liczba, int* wynik, int podstawa, int nowaPodstawa){
         kopiujCyfry(liczba, wynik);
         return 0;
     }
+
+    if (nowaPodstawa < podstawa){
+        int logP = log2(podstawa) / log2(nowaPodstawa);
+        if (logP * dlugoscLiczby(liczba) > max_dl_liczby){
+            ustawCyfry(wynik, -1);
+            return 1;
+        }
+    }
+
     int kopiaLiczba[max_dl_liczby];
     kopiujCyfry(liczba, kopiaLiczba);
 
@@ -207,6 +217,13 @@ int wykonajDodawanie(int* liczba1, int* liczba2, int* wynik, int podstawa){
     kopiujCyfry(liczba2, kopiaLiczba2);
     zerujCyfry(wynik);
 
+    int dlugoscLiczby1 = dlugoscLiczby(kopiaLiczba1);
+    int dlugoscLiczby2 = dlugoscLiczby(kopiaLiczba2);
+    if (dlugoscLiczby1 == max_dl_liczby && dlugoscLiczby2 == max_dl_liczby){
+        ustawCyfry(wynik, -1);
+        return 1;
+    }
+
     for(int i=max_dl_liczby - 1; i >=0; i--){
         wynik[i] = kopiaLiczba1[i] + kopiaLiczba2[i];
         if(wynik[i] >= podstawa){
@@ -223,13 +240,11 @@ int wykonajMnozenie(int* liczba1, int* liczba2, int* wynik, int podstawa){
     int kopiaLiczba2[max_dl_liczby];
     kopiujCyfry(liczba2, kopiaLiczba2);
     zerujCyfry(wynik);
+
     int dlugoscLiczby1 = dlugoscLiczby(kopiaLiczba1);
     int dlugoscLiczby2 = dlugoscLiczby(kopiaLiczba2);
-
     if (dlugoscLiczby1 + dlugoscLiczby2 > max_dl_liczby){
-        for(int i=0; i<max_dl_liczby; i++){
-            wynik[i] = podstawa -1;
-        }
+        ustawCyfry(wynik, -1);
         return 1;
     }
 
@@ -253,12 +268,27 @@ int wykonajPotegowanie(int* liczba, int* potega, int* wynik, int podstawa){
     zerujCyfry(wynik);
     wynik[max_dl_liczby-1] = 1;
 
-    if (dlugoscLiczby(potega) == 0){
+    int dlugoscPotegi = dlugoscLiczby(potega);
+    if (dlugoscPotegi == 0){
         return 0;
     }
-    if(dlugoscLiczby(potega) == 1 && potega[max_dl_liczby-1] == 1){
+    if(dlugoscPotegi == 1 && potega[max_dl_liczby-1] == 1){
         kopiujCyfry(liczba, wynik);
         return 0;
+    }
+
+    int dlugosc_Liczby = dlugoscLiczby(liczba);
+    int dlugoscLiczbyTab[max_dl_liczby] = {0};
+    stworzLiczbe(dlugosc_Liczby, podstawa, dlugoscLiczbyTab);
+
+    int maxDlugoscLiczbyTab[max_dl_liczby] = {0}; 
+    stworzLiczbe(max_dl_liczby, podstawa, maxDlugoscLiczbyTab);
+
+    int liczbaRazyPotega[max_dl_liczby] = {0};
+    wykonajMnozenie(dlugoscLiczbyTab, potega, liczbaRazyPotega, podstawa);
+    if (porownajLiczby(liczbaRazyPotega, maxDlugoscLiczbyTab) > 0){
+        ustawCyfry(wynik, -1);
+        return 1;
     }
 
     int kopiaLiczba[max_dl_liczby];
@@ -490,6 +520,11 @@ int zamienNaCyfre(char znak, int podstawa){
 
 int zapiszWynik(int* wynik, int podstawa, FILE *fptr2){
     printf("zapiszWynik: ");
+    if (wynik[0] < 0){
+        printf("poza zakresem\n");
+        fputs("poza zakresem\n\n\n", fptr2);
+        return 0;
+    }
     int i = 0;
     while (i < max_dl_liczby && wynik[i] == 0){
         i++;
@@ -543,8 +578,12 @@ void kopiujCyfry(int* zrodlo, int* przeznaczenie){
 }
 
 void zerujCyfry(int* liczba){
+    ustawCyfry(liczba, 0);
+}
+
+void ustawCyfry(int* liczba, int cyfra){
     for (int i = 0; i < max_dl_liczby; i++){
-        liczba[i] = 0;
+        liczba[i] = cyfra;
     }
 }
 
