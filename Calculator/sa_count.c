@@ -2,14 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
-#define max_dl_liczby 10
+#define max_dl_liczby 40
 #define max_dl_linii (max_dl_liczby + 1)
 #define max_do 7
 
 enum Operacja {dodawanie = 1, mnozenie = 2, potegowanie = 3, dzielenie = 4, modulo = 5, zmiana_podstawy = 6, nieznana = 0};
 
-int wykonajDzialanie(FILE *fptr, FILE *fptr2);
+int wykonajDzialanie(FILE *daneFptr, FILE *wynikiFptr);
 int zamianaPodstawy(int* liczba, int* wynik, int podstawa, int nowapodstawa);
 int policz(int* liczba1, int* liczba2, int* wynik, int podstawa, enum Operacja operacja);
 int wykonajDodawanie(int* liczba1, int* liczba2, int* wynik, int podstawa);
@@ -20,12 +21,13 @@ int wykonajModulo(int* dzielna, int* dzielnik, int* wynik, int podstawa);
 int wykonajOdejmowanie(int* odjemna, int* odjemnik, int* wynik, int podstawa);
 enum Operacja wczytajOperacje(char *operacja);
 int wczytajPodstawe(char *operacja);
-int wczytajLiczbe(FILE *fptr, FILE *fptr2, int* liczba, int podstawa);
+int wczytajLiczbe(FILE *daneFptr, FILE *wynikiFptr, int* liczba, int podstawa);
 char zamienNaZnak(int liczba);
 int zamienNaCyfry(char* znaki, int* liczba, int podstawa);
 int zamienNaCyfre(char znak, int podstawa);
 int policzWartosc(int* liczba, int podstawa);
-int zapiszWynik(int* wynik, int podstawa, FILE *fptr2);
+void zapiszWynik(int* wynik, int podstawa, FILE *wynikiFptr);
+void zapiszBledneDane(FILE *wynikiFptr);
 int porownajLiczby(int* liczba1, int* liczba2);
 int dlugoscLiczby(int* liczba);
 void kopiujCyfry(int* zrodlo, int* przeznaczenie);
@@ -42,31 +44,28 @@ int main(int argc, char *argv[]){
     if(argc > 2){
         fout = argv[2];
     }
-    FILE *fptr;
-    fptr = fopen(fin, "r");
-    FILE *fptr2;
-    fptr2 = fopen(fout, "w");
-    while (!feof(fptr)){
-        wykonajDzialanie(fptr, fptr2);
+    FILE *daneFptr = fopen(fin, "r");
+    FILE *wynikiFptr = fopen(fout, "w");
+    while (!feof(daneFptr)){
+        wykonajDzialanie(daneFptr, wynikiFptr);
     }
-    fclose(fptr);
-    fclose(fptr2); 
+    fclose(daneFptr);
+    fclose(wynikiFptr); 
     return 0;
 }
 
-int wykonajDzialanie(FILE *fptr, FILE *fptr2){
+int wykonajDzialanie(FILE *daneFptr, FILE *wynikiFptr){
     char definicja_operacji[max_do];
-    if (fgets(definicja_operacji, max_do, fptr) == NULL){
+    if (fgets(definicja_operacji, max_do, daneFptr) == NULL){
         return -1;
     };
     if (definicja_operacji[0] == '\n'){
         return -1;
     }
-    printf("\nop: %s", definicja_operacji);
-    fputs(definicja_operacji, fptr2);
-    fputc('\n', fptr2);
+    if (strchr(definicja_operacji, '\n') == NULL){
+        return -1;
+    }
     enum Operacja operacja = wczytajOperacje(definicja_operacji);
-    printf("operacja %d\n", operacja);
     if (operacja == nieznana){
         return -2;
     }
@@ -74,7 +73,10 @@ int wykonajDzialanie(FILE *fptr, FILE *fptr2){
     if (podstawa <= 0){
         return -3;
     }
-    printf("podstawa %d\n", podstawa);
+
+    fputs(definicja_operacji, wynikiFptr);
+    fputc('\n', wynikiFptr);
+
     int* liczba1 = malloc(sizeof(int) * max_dl_liczby);
     int* liczba2 = malloc(sizeof(int) * max_dl_liczby);
     int* wynik = malloc(sizeof(int) * max_dl_liczby);
@@ -88,34 +90,31 @@ int wykonajDzialanie(FILE *fptr, FILE *fptr2){
             npStart++;
         }
         int nowaPodstawa = wczytajPodstawe(npStart);
-        printf("nowa podstawa: %d\n", nowaPodstawa);
 
-        while((wczytajLiczbe(fptr, fptr2, liczba1, podstawa)) >= 0){
-            //printf("liczba1: %s\n", liczba1);
+        while((wczytajLiczbe(daneFptr, wynikiFptr, liczba1, podstawa)) >= 0){
             zerujCyfry(wynik);
             if (zamianaPodstawy(liczba1, wynik, podstawa, nowaPodstawa) >= 0){
-                //printf("wynik: %s\n", wynik);
-                zapiszWynik(wynik, nowaPodstawa, fptr2);
+                zapiszWynik(wynik, nowaPodstawa, wynikiFptr);
             }
         }
     }
     else{
-        if (wczytajLiczbe(fptr, fptr2, wynik, podstawa) == 0){
-            printf("liczba1 (wynik): %s\n", wynik);
+        if (wczytajLiczbe(daneFptr, wynikiFptr, wynik, podstawa) == 0){
             int liczba;
-            while((wczytajLiczbe(fptr, fptr2, liczba2, podstawa)) == 0){
+            int wynikWczytania = wczytajLiczbe(daneFptr, wynikiFptr, liczba2, podstawa);
+            while(wynikWczytania == 0){
                 int* tmp = wynik;
                 wynik = liczba1;
                 liczba1 = tmp;
-                // printf("liczba1: %s\n", liczba1);
-                // printf("liczba2: %s\n", liczba2);
                 policz(liczba1, liczba2, wynik, podstawa, operacja);
-                // printf("wynik: %s\n", wynik);
+                 wynikWczytania = wczytajLiczbe(daneFptr, wynikiFptr, liczba2, podstawa);
             }
-            printf("wynik: %s\n", wynik);
-            zapiszWynik(wynik, podstawa, fptr2);
+            if (wynikWczytania > -5){
+                zapiszWynik(wynik, podstawa, wynikiFptr);
+            }
         }
     }
+    fputs("\n\n", wynikiFptr);
     free(liczba1);
     free(liczba2);
     free(wynik);
@@ -179,7 +178,6 @@ int zamianaPodstawy(int* liczba, int* wynik, int podstawa, int nowaPodstawa){
             wykonajMnozenie(podstawaWsystemie, cyfra, cyfra, nowaPodstawa);
             wykonajDodawanie(wynik, cyfra, wynik, nowaPodstawa);
             wykonajMnozenie(podstawaWsystemie, podstawaTab, podstawaWsystemie, nowaPodstawa);
-            
         }
     }
 
@@ -355,17 +353,26 @@ int wykonajDzielenie(int* dzielna, int* dzielnik, int* wynik, int* reszta, int p
     jeden[max_dl_liczby - 1] = 1;
     int dzielnikPoprzedni[max_dl_liczby];
 
+    int wynikPoprzedni[max_dl_liczby] = {0};
+    wynik[max_dl_liczby-1] = 1;
+    int dwa[max_dl_liczby] = {0};
+    stworzLiczbe(2, podstawa, dwa);
+
     while(porownajLiczby(kopiaDzielna, nowyDzielnik) >= 0){
-        wykonajDodawanie(wynik, jeden, wynik, podstawa);
-        if (reszta != NULL){
-            kopiujCyfry(nowyDzielnik, dzielnikPoprzedni);
-        }
-        wykonajDodawanie(nowyDzielnik, kopiaDzielnik, nowyDzielnik, podstawa);
+        kopiujCyfry(nowyDzielnik, dzielnikPoprzedni);
+        wykonajMnozenie(nowyDzielnik, dwa, nowyDzielnik, podstawa);
+        kopiujCyfry(wynik, wynikPoprzedni);
+        wykonajMnozenie(wynik, dwa, wynik, podstawa);
     }
 
-    if (reszta != NULL){
-        wykonajOdejmowanie(kopiaDzielna, dzielnikPoprzedni, reszta, podstawa);
-    }
+    kopiujCyfry(wynikPoprzedni, wynik);
+    kopiujCyfry(dzielnikPoprzedni, nowyDzielnik);
+
+    int nowaDzielna[max_dl_liczby];
+    wykonajOdejmowanie(kopiaDzielna, nowyDzielnik, nowaDzielna, podstawa);
+    wykonajDzielenie(nowaDzielna, kopiaDzielnik, wynikPoprzedni, reszta, podstawa);
+
+    wykonajDodawanie(wynik, wynikPoprzedni, wynik, podstawa);
 
     return 0;
 }
@@ -381,17 +388,17 @@ int wykonajModulo(int* dzielna, int* dzielnik, int* wynik, int podstawa){
 }
 
 int wykonajOdejmowanie(int* odjemna, int* odjemnik, int* wynik, int podstawa){
-    zerujCyfry(wynik);
-    
-    int porownanie = porownajLiczby(odjemna, odjemnik);
-    if (porownanie <= 0){
-        return 0;
-    }
-
     int kopiaOdjemna[max_dl_liczby];
     kopiujCyfry(odjemna, kopiaOdjemna);
     int kopiaOdjemnik[max_dl_liczby];
     kopiujCyfry(odjemnik, kopiaOdjemnik);
+
+    zerujCyfry(wynik);
+    
+    int porownanie = porownajLiczby(kopiaOdjemna, kopiaOdjemnik);
+    if (porownanie <= 0){
+        return 0;
+    }
 
     for(int i=max_dl_liczby-1; i>=0; i--){
         if (kopiaOdjemna[i] < 0){
@@ -446,27 +453,35 @@ int wczytajPodstawe(char *operacja){
     return podstawa;
 }
 
-int wczytajLiczbe(FILE *fptr, FILE *fptr2, int* liczba, int podstawa){
+int wczytajLiczbe(FILE *daneFptr, FILE *wynikiFptr, int* liczba, int podstawa){
     char bufor[max_dl_linii];
-    if (fgets(bufor, max_dl_linii, fptr) == NULL){
+    if (fgets(bufor, max_dl_linii, daneFptr) == NULL){
         return -1;
     }
     if (bufor[0] != '\n'){
         return -2;
     }
-    if (fgets(bufor, max_dl_linii, fptr) == NULL){
+    if (fgets(bufor, max_dl_linii, daneFptr) == NULL){
         return -3;
     }
     if (bufor[0] != '\n'){
-        fputs(bufor, fptr2);
-        fputs("\n", fptr2);
+        fputs(bufor, wynikiFptr);
+        fputs("\n", wynikiFptr);
+
+        if (strchr(bufor, '\n') == NULL){
+            zapiszBledneDane(wynikiFptr);
+            return -5;
+        }
+
         size_t len = strlen(bufor);
         if (len > 0 && bufor[--len] == '\n') {
             bufor[len] = '\0';
         }
-        printf("odczyt: %s\n", bufor);
-        zamienNaCyfry(bufor, liczba, podstawa);
-        return 0;
+        if (zamienNaCyfry(bufor, liczba, podstawa) == 0){
+            return 0;
+        }
+        zapiszBledneDane(wynikiFptr);
+        return -6;
     }
     return -4;
  }
@@ -493,11 +508,7 @@ int zamienNaCyfry(char* znaki, int* liczba, int podstawa){
     while (--i >= 0){
         liczba[i] = 0;
     }
-    // printf("liczby: ");
-    // for(int i = 0; i < max_dl_liczby; i++){
-    //     printf("%d,", liczba[i]);
-    // }
-    // printf("\n");
+    return 0;
 }
 
 int zamienNaCyfre(char znak, int podstawa){
@@ -518,29 +529,28 @@ int zamienNaCyfre(char znak, int podstawa){
     return (cyfra >= 0) ? cyfra : -4;
 }
 
-int zapiszWynik(int* wynik, int podstawa, FILE *fptr2){
-    printf("zapiszWynik: ");
+void zapiszWynik(int* wynik, int podstawa, FILE *wynikiFptr){
     if (wynik[0] < 0){
-        printf("poza zakresem\n");
-        fputs("poza zakresem\n\n\n", fptr2);
-        return 0;
+        fputs("poza zakresem\n\n", wynikiFptr);
+        return;
     }
     int i = 0;
     while (i < max_dl_liczby && wynik[i] == 0){
         i++;
     }
     if(i == max_dl_liczby){
-        printf("%c", '0');
-        fputc('0', fptr2);
+        fputc('0', wynikiFptr);
     }
     while (i < max_dl_liczby){
         char znak = zamienNaZnak(wynik[i++]); 
-        printf("%c", znak);
-        fputc(znak, fptr2);
+        fputc(znak, wynikiFptr);
     }
-    printf("\n");
-    fputs("\n\n\n", fptr2);
-    return 0;
+    fputs("\n\n", wynikiFptr);
+    return;
+}
+
+void zapiszBledneDane(FILE *wynikiFptr){
+     fputs("błędne dane\n\n", wynikiFptr);
 }
 
 int porownajLiczby(int* liczba1, int* liczba2){
